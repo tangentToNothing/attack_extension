@@ -1,0 +1,27 @@
+{
+    "manifest_version": 2,
+    "name": "MITRE ATT&CK Lookup Extension",
+    "version": "0.1",
+    "content_scripts": [
+        {
+            "run_at": "document_end",
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": ["jquery-3.4.1.min.js", "lookup.js"],
+            "all_frames": true
+        }
+    ],
+    "browser_action": {
+        "default_icon": "favicon.png",
+        "default_popup": "popup.html"
+    },
+    "permissions": [
+        "activeTab",
+        "storage",
+        "tabs"
+    ],
+    "web_accessible_resources": [
+        "data/enterprise-attack.json"
+    ]
+}
