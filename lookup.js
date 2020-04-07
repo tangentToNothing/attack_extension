@@ -4,6 +4,7 @@ const options = ({
         display: 'inline',
         backgroundColor: 'yellow'
     },
+    description_length: 400,
     panelCss:{
         'border':'1px solid #e3e3e3',
         'line-height':0,
@@ -37,12 +38,23 @@ chrome.storage.sync.get('optionsText', e => {
         });
       } catch (e) { console.error('Error parsing Selection Highlighter options.\n\n',e); }
     }
-    var href = window.location.href;
-    if (/docs\.google\.com/.exec(href)) {
-        initialize_docs();
-    } else {
-        initialize();
-    }
+    chrome.storage.sync.get('mitre_attack_extension', e => { 
+        if (e.mitre_attack_extension) {
+            if (e.mitre_attack_extension == 'disabled') {
+               return;
+            }
+            if (e.mitre_attack_extension == 'enabled') {
+                var href = window.location.href;
+                $('<div id="technique_content"></div>').appendTo(document.body);
+                hide_pane();
+                if (/docs\.google\.com/.exec(href)) {
+                    initialize_docs();
+                } else {
+                    initialize();
+                }
+            }
+        }
+    });
 });
 
 document.addEventListener('mousemove', onMouseUpdate, false);
@@ -75,48 +87,63 @@ text_truncate = function(str, length, ending) {
     }
   };
 
-function create_and_display_info (techniques) {
-    var posX = getMouseX() + 20;
-    var posY = getMouseY();
-    $('#technique_content').empty();
-    $("#technique_content").css({
-        'border':'1px solid #e3e3e3',
-        'line-height':0,
-        'overflow':'hidden',
-        'padding':'2px',
-        'margin':0,
-        'position':'absolute',
-        'z-index':2147483647,
-        'border-radius':'3px',
-        'box-shadow':'3px 3px 9px 5px rgba(0,0,0,0.33)',
-        'top': posY,
-        'left': posX,
-        'background-color': 'lightblue'
-    });
-    if (techniques.length == 1) {
-        $('#technique_content').css({'display': 'block'});
-        $('<div id="technique_content"></div>').appendTo(document.body);
-        display_techniques(techniques);
-        
-    } else if (techniques.length > 1) {
-        $('#technique_content').css({'display': 'block'});
-        $('<div id="technique_content"><h2>Two Techniques Found</h2></div>').appendTo(document.body);
-        display_techniques(techniques);
-    } else {
-        return;
+function create_and_display_info (techniques, selectionString) {
+    if ($('#technique_content').css('display') !== 'block') {
+        var posX = getMouseX() + 20;
+        var posY = getMouseY();
+        //$('#technique_content').empty();
+        $("#technique_content").css({
+            'border':'1px solid #e3e3e3',
+            'text-align': 'left',
+            'overflow':'hidden',
+            'padding':'2px',
+            'margin':2,
+            'position':'absolute',
+            'z-index':2147483647,
+            'border-radius':'3px',
+            'box-shadow':'3px 3px 9px 5px rgba(0,0,0,0.33)',
+            'top': posY,
+            'left': posX,
+            'background-color': 'white',
+            'max-width': '450px',
+            'word-wrap': 'break-word'
+        });
+        $("#technique_logo").css({
+            'height': 'auto'
+            //'float': 'right'
+        });
+        $('.technique_description').css({
+            // 'word-wrap': 'break-word',
+            //'overflow-wrap': 'word-break'
+            // 'white-space': 'pre-wrap',
+            // 'padding': '1px',
+            // 'max-width': '300px'
+        });
+        display_techniques(techniques, selectionString);
     }
 }
 
-function display_techniques(techniques) {
-    $.each(techniques, function(i, item) {
-        console.log(item);
-        console.log(i);
-        $("#technique_content").append("<h3>" + item.name + "</h3>");
-        $("#technique_content").append("<p>Type: " + item.type + "</p>");
-        $("#technique_content").append("<p>Description: " + text_truncate(item.description, 100, "...") + "</p>");
-        //$("#technique_content").append("</ul>");
-        
+function display_techniques(techniques, selectionString) {
+    const url = chrome.runtime.getURL('favicon.png');
+
+    var desc = text_truncate(techniques[0].description, options.description_length, "...");
+
+    var tactic = "";
+    $.each(techniques[0].kill_chain_phases, function(i, item) {
+        if (item.kill_chain_name == "mitre-attack") {
+            tactic += item.phase_name.replace(/\-/g, ' ');
+            if (i != techniques[0].kill_chain_phases.length - 1) {
+                tactic += "  ";
+            }
+        }
     });
+
+    $('#technique_content').append('<img id="technique_logo" align="right" src="' + url + '">');
+    $("#technique_content").append("<h3>" + selectionString + "-" + techniques[0].name + "</h3>");
+    $("#technique_content").append('<p style="text-transform: capitalize;">Tactic: ' + tactic.replace(/\W\W/g, ', ') + '</p>');
+    $("#technique_content").append('<p class="technique_description">Description: ' + desc + '</p>');
+    $("#technique_content").append('<p>Link: <a target="_blank" rel="noopener noreferrer" href="https://attack.mitre.org/techniques/' + selectionString + '/">View ' + selectionString + ' on the MITRE ATT&CK Site</a></p>');
+    $('#technique_content').css({'display': 'block'});
 }
 
 function hide_pane () {
@@ -126,7 +153,8 @@ function hide_pane () {
 }
 
 function initialize_docs () {
-    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseDown);
+    // document.addEventListener('mouseEnter', onMouseDown);
     
     const url = chrome.runtime.getURL('data/enterprise-attack.json');
 
@@ -135,31 +163,31 @@ function initialize_docs () {
     xhReq.send(null);
     const db = JSON.parse(xhReq.responseText);
 
-    //console.log(db[0]);
 
     function onMouseDown (e) {
-        var googleDocument = getGoogleDocument();
-        const selection = googleDocument.selectedText;
-        const trimmedSelection = String(selection).match(options.trimRegex());
-        if (!trimmedSelection) {
-            hide_pane();
-            return;
-        }
-        const selectionString = trimmedSelection[2];
-        if (!options.isSelectionValid({ selectionString, selection })) {
-            hide_pane();
-            return;
-        }
-        var techniques = [];
-        $.each( db, function(i, item){
-            $.each(item.external_references, function( I_child, item_child){
-                if( item_child.external_id==selectionString) {
-                    techniques.push(item);
-                    return false;  // end "each" when found
-                }
+            var googleDocument = getGoogleDocument();
+            const selection = googleDocument.selectedText;
+            const trimmedSelection = String(selection).match(options.trimRegex());
+            if (!trimmedSelection) {
+                hide_pane();
+                return;
+            }
+            const selectionString = trimmedSelection[2];
+            if (!options.isSelectionValid({ selectionString, selection })) {
+                hide_pane();
+                return;
+            }
+            var techniques = [];
+            $.each( db, function(i, item){
+                $.each(item.external_references, function( I_child, item_child){
+                    if( item_child.external_id==selectionString) {
+                        techniques.push(item);
+                        return false;  // end "each" when found
+                    }
+                });
             });
-        });
-        create_and_display_info(techniques);
+            create_and_display_info(techniques, selectionString);
+        
     }
 }
 
@@ -173,7 +201,6 @@ function initialize () {
     xhReq.send(null);
     const db = JSON.parse(xhReq.responseText);
 
-    //console.log(db[0]);
 
     function onSelectionChange (e) {
         const selection = document.getSelection();
