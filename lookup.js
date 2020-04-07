@@ -4,7 +4,7 @@ const options = ({
         display: 'inline',
         backgroundColor: 'yellow'
     },
-    description_length: 400,
+    description_length: 600,
     panelCss:{
         'border':'1px solid #e3e3e3',
         'line-height':0,
@@ -106,7 +106,8 @@ function create_and_display_info (techniques, selectionString) {
             'left': posX,
             'background-color': 'white',
             'max-width': '450px',
-            'word-wrap': 'break-word'
+            'word-wrap': 'break-word',
+            'font-family': 'Arial, Helvetica, sans-serif'
         });
         $("#technique_logo").css({
             'height': 'auto'
@@ -225,7 +226,7 @@ function initialize () {
                 }
             });
         });
-        create_and_display_info(techniques);
+        create_and_display_info(techniques, selectionString);
         
     }
 }
