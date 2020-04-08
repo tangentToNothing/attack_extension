@@ -19,7 +19,6 @@
     "permissions": [
         "activeTab",
         "storage",
-        "tabs",
         "<all_urls>"
     ],
     "web_accessible_resources": [
